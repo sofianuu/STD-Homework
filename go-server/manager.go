@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"websocket-go/db"
+	//"websocket-go/models"
 )
 
 var (
@@ -24,6 +27,7 @@ type Manager struct {
 	sync.RWMutex
 
 	opts RetentionMap
+
 }
 
 func NewManager(ctx context.Context) *Manager {
@@ -66,7 +70,18 @@ func (m *Manager) serverWS(w http.ResponseWriter, r *http.Request) {
 	//conn.Close()
 }
 
+
 func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8081") // sau "*" temporar în dev
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	type userLoginRequest struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -79,12 +94,20 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "gabi" && req.Password == "123" {
+	ok, _, err := db.LoginUser(req.Username, req.Password)
+	if err != nil{
+		log.Println(err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if ok {
+
+		otp := m.opts.NewOTP()
+
 		type response struct {
 			OTP string `json:"otp"`
 		}
-
-		otp := m.opts.NewOTP()
 
 		resp := response{
 			OTP: otp.Key,
@@ -93,13 +116,13 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 		data, err := json.Marshal(resp)
 		if err != nil {
 			log.Println(err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
 		return
-
 	}
 
 	w.WriteHeader(http.StatusUnauthorized)
@@ -127,9 +150,11 @@ func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 
 	switch origin {
-	case "https://localhost:8080":
+	case "http://localhost:8080", "https://localhost:8080", "http://localhost:8081", "https://localhost:8081":
 		return true
 	default:
 		return false
 	}
 }
+
+
