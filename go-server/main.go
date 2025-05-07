@@ -4,25 +4,24 @@ import (
 	"context"
 	"log"
 	"net/http"
-
+	"websocket-go/db"
 )
 
-
-func main(){
+func main() {
 	setupAPI()
- //db.InitMongo()
+	db.Connect()
 
-	log.Fatal(http.ListenAndServe(":8080",nil))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
 }
 
-func setupAPI(){
+func setupAPI() {
 	ctx := context.Background()
 
-	manager := NewManager(ctx) 
+	manager := NewManager(ctx)
 
 	http.Handle("/", http.FileServer(http.Dir("../vue-chat")))
 	http.HandleFunc("/ws", manager.serverWS)
 	http.HandleFunc("/login", manager.loginHandler)
+	http.HandleFunc("/register", manager.registerHandler)
 }
-

@@ -129,6 +129,75 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (m *Manager) registerHandler(w http.ResponseWriter, r *http.Request){
+	
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8081") // sau "*" temporar în dev
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	type userRegisterRequest struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	var req userRegisterRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Username == "" || req.Password == "" || req.Email == "" {
+		http.Error(w, "Username, password and email are required", http.StatusBadRequest)
+		return 
+	}
+
+	user, err := db.RegisterUser(req.Username, req.Password, req.Email) 
+	if err != nil {
+		log.Printf("Failed to register user: %v", err)
+		http.Error(w, err.Error(),http.StatusBadRequest)
+		return
+	}
+
+	type response struct {
+		Succes bool `json:"success"`
+		Message string `json:"message"`
+		User struct {
+			ID string `json:"id"`
+			Username string `json:"username"`
+			Email string `json:"email"`
+		} `json:"user"`
+	}
+
+	resp := response{
+		Succes: true,
+		Message: "User registered succesfully",
+		User: struct{ID string "json:\"id\""; Username string "json:\"username\""; Email string "json:\"email\""}{
+			ID: user.ID.Hex(),
+			Username: user.Username,
+			Email: user.Email,
+		},
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Failed to marshal response: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+
+}
+
 func (m *Manager) addClient(client *Client) {
 	m.Lock()
 	defer m.Unlock()
