@@ -10,6 +10,7 @@ import (
 type OTP struct {
 	Key     string
 	Created time.Time
+	Username string
 }
 
 type RetentionMap map[string]OTP
@@ -38,6 +39,20 @@ func (rm RetentionMap) VerifyOTP(otp string) bool{
 	}
 	delete(rm, otp)
 	return true
+}
+
+func (rm RetentionMap) SetUsername(otpKey string, username string) {
+	if otp, ok := rm[otpKey]; ok {
+		otp.Username = username
+		rm[otpKey] = otp
+	}
+}
+
+func (rm RetentionMap) GetUsername(otpKey string) string {
+	if otp, ok := rm[otpKey]; ok {
+		return otp.Username
+	}
+	return ""
 }
 
 func (rm RetentionMap) Retention(ctx context.Context, retentionPeriod time.Duration){

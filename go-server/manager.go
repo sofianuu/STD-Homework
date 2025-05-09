@@ -58,10 +58,26 @@ func (m *Manager) serverWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	username := m.opts.GetUsername(otp)
 
-	client := NewClient(conn, m)
+	client := NewClient(conn, m, username)
 
 	m.addClient(client)
+
+	messages, err := db.GetMessages()
+	if err != nil {
+		log.Printf("Error getting last messages: %v", err)
+	}else {
+		historyJSON, err := json.Marshal(map[string]interface{}{
+			"type": "history",
+			"messages": messages,
+		})
+		if err != nil {
+			log.Printf("Error marshaling history: %v", err)
+		} else {
+			client.egress <- historyJSON
+		}
+	}
 
 	//start client processes
 	go client.readMessages()
@@ -105,12 +121,16 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 		otp := m.opts.NewOTP()
 
+		m.opts.SetUsername(otp.Key, req.Username )
+
 		type response struct {
 			OTP string `json:"otp"`
+			Username string `json:"username"`
 		}
 
 		resp := response{
 			OTP: otp.Key,
+			Username: req.Username,
 		}
 
 		data, err := json.Marshal(resp)
